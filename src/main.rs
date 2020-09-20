@@ -3,8 +3,10 @@
 use dirs;
 use diskspace_insight;
 use diskspace_insight::{DirInfo, File};
-use egui::{Slider, Ui, Window, Label, TextStyle};
-use egui_glium::{storage::FileStorage, RunMode};
+use egui::math::Vec2;
+use egui::paint::color::Srgba;
+use egui::{paint::PaintCmd, Label, Rect, Slider, Style, TextStyle, Ui, Window};
+use egui_glium::storage::FileStorage;
 use std::sync::mpsc::channel;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -14,6 +16,7 @@ struct MyApp {
     my_string: String,
     max_types: i32,
     max_files: i32,
+    max_dirs: i32,
     info: Option<DirInfo>,
     allow_delete: bool,
     filter_chain: Vec<Filter>,
@@ -28,46 +31,60 @@ enum Filter {
 }
 
 fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
-
-
     ui.horizontal(|ui| {
         // ui.label(format!("{:<10}MB", file.size / 1024 / 1024));
-        ui.add(Label::new(format!("{:8} MB", file.size / 1024 / 1024)).text_style(TextStyle::Monospace));
+        ui.add(
+            Label::new(format!("{:8} MB", file.size / 1024 / 1024))
+                .text_style(TextStyle::Monospace),
+        );
         // ui.expand_to_size(egui::math::Vec2::new(100.,10.));
         if allow_delete {
             if ui.button("Del").clicked {
-                std::fs::remove_file(&file.path);
+                let _ = std::fs::remove_file(&file.path);
             }
         }
         ui.label(format!("{}", file.path.display()));
     });
 
-    // ui.columns(columns, |columns| {
-    //     columns[0].label(format!("{}", file.path.display(),));
-    //     columns[1]
-    //         .right_column(60.)
-    //         .label(format!("{}MB", file.size / 1024 / 1024));
+}
 
-    //     // columns[2].right_column(60.).label(format!(
-    //     //     "del"
-    //     // ));
-    //     if allow_delete {
-    //         columns[2].right_column(60.).label(format!("del",));
-    //     }
-    // });
-    // if allow_delete {
-    //     if ui.button("Del").clicked {}
-    // }
+fn gen_light_style() -> Style {
+    let mut style = Style::default();
+    style.visuals.window_corner_radius = 1.;
+    style
+}
+
+fn paint_size_bar_before_next(ui: &mut Ui, scale: f32, color: Srgba) {
+    // ask for available space - this is just to get the cursor
+    let mut paint_rect = ui.available();
+    paint_rect.max.y = paint_rect.min.y + ui.style().spacing.interact_size.y + 2.;
+    paint_rect.max.x = paint_rect.min.x + ui.available().size().x * scale;
+
+    ui.painter().add(PaintCmd::Rect {
+        rect: paint_rect,
+        corner_radius: 2.,
+        fill: color,
+        stroke: egui::paint::command::Stroke::default(),
+    });
 }
 
 impl egui::app::App for MyApp {
     /// This function will be called whenever the Ui needs to be shown,
     /// which may be many times per second.
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut dyn egui::app::Backend) {
+        let accent_color = Srgba::new(120, 50, 200, 255);
+
+        ui.set_style(gen_light_style());
+        ui.style_mut().visuals.window_corner_radius = 1.;
+        ui.style_mut().visuals.dark_bg_color = Srgba::new(100, 0, 100, 255);
+
+        // ui.style_mut().visuals.dark_bg_color
+
         let MyApp {
             my_string,
             max_types,
             max_files,
+            max_dirs,
             info,
             allow_delete,
             filter_chain,
@@ -111,14 +128,26 @@ impl egui::app::App for MyApp {
         Window::new("Filetypes").scroll(true).show(ui.ctx(), |ui| {
             ui.label(format!("Files by type, largest first"));
             ui.add(Slider::i32(max_types, 1..=100).text("max results"));
+            //ui.painter().rect_filled(Rect::from_min_max(pos2(0., 0.), pos2(100., 100.)), 2., Srgba::new(255,0,255, 255));
+            // let visuals = ui.style().interact(&response);
 
             if let Some(info) = info {
                 for (i, filetype) in info.types_by_size.iter().enumerate() {
                     if i as i32 >= *max_types {
                         break;
                     }
+
+                    let scale = filetype.size as f32 / info.combined_size as f32;
+                    paint_size_bar_before_next(ui, scale, accent_color);
+
                     ui.collapsing(
-                        format!("{} ({}MB)", filetype.ext, filetype.size / 1024 / 1024),
+                        format!(
+                            "{} | {}MB | {}% | {} files",
+                            filetype.ext,
+                            filetype.size / 1024 / 1024,
+                            (scale * 100.) as u8,
+                            filetype.files.len()
+                        ),
                         |ui| {
                             for file in &filetype.files {
                                 draw_file(ui, file, *allow_delete);
@@ -146,8 +175,35 @@ impl egui::app::App for MyApp {
         Window::new("Directories")
             .scroll(true)
             .show(ui.ctx(), |ui| {
-                ui.label(format!("Files by type, largest first"));
-                if let Some(info) = info {}
+                ui.label(format!("Directories"));
+                ui.add(Slider::i32(max_dirs, 1..=100).text("max results"));
+
+                if let Some(info) = info {
+                    for (i, dir) in info.dirs_by_size.iter().enumerate() {
+                        if i as i32 > *max_dirs {
+                            break;
+                        }
+
+                        let scale = dir.size as f32 / info.combined_size as f32;
+
+                        paint_size_bar_before_next(ui, scale, accent_color);
+                        
+                        // ui.label(format!("{:?} {}", dir.path, dir.size / 1024 / 1024));
+                        ui.collapsing(
+                            format!(
+                                "{} | {}MB | {}%",
+                                dir.path.file_name().map(|d| d.to_string_lossy().to_string()).unwrap_or_default(),
+                                dir.size / 1024 / 1024,
+                                (scale * 100.) as u8
+                            ),
+                            |ui| {
+                                // for file in &filetype.files {
+                                //     draw_file(ui, file, *allow_delete);
+                                // }
+                            },
+                        );
+                    }
+                }
             });
 
         Window::new("Filter builder")
@@ -241,7 +297,6 @@ impl egui::app::App for MyApp {
                                 }
                             }
 
-
                             draw_file(ui, file, *allow_delete);
 
                             i += 1;
@@ -256,10 +311,12 @@ impl egui::app::App for MyApp {
     // }
 }
 
+
+
+
 fn main() {
     // let i = diskspace_insight::scan("/home/woelper/Downloads");
-
-    let title = "Spaced";
+    let title = "birdseye";
     let storage = FileStorage::from_path(".birdseye.json".into());
     let mut app: MyApp = MyApp::default();
     app.my_string = dirs::home_dir()
@@ -268,5 +325,6 @@ fn main() {
         .to_string();
     app.max_types = 10;
     app.max_files = 40;
-    egui_glium::run(title, RunMode::Reactive, storage, app);
+    app.max_dirs = 20;
+    egui_glium::run(title, storage, app);
 }
