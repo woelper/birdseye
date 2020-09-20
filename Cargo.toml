@@ -12,6 +12,7 @@ egui_glium = { git = "https://github.com/emilk/egui.git" }
 #diskspace_insight = "*"
 diskspace_insight = { path = "../diskspace-insight" }
 dirs = "*"
+humansize = "*"
 
 # serde = { version = "1", features = ["derive"] }
 
