@@ -1,4 +1,5 @@
 #![warn(clippy::all)]
+#![windows_subsystem = "windows"]
 
 use dirs;
 use diskspace_insight;
