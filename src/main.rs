@@ -3,15 +3,20 @@
 
 use dirs;
 use diskspace_insight;
-use diskspace_insight::{DirInfo, File};
+use diskspace_insight::{DirInfo, File, Directory};
 // use egui::math::Vec2;
 use egui::paint::color::Srgba;
-use egui::{paint::PaintCmd, Label, Rect, Slider, Style, TextStyle, Ui, Window};
+use egui::{paint::PaintCmd, Label, Rect, Slider, Style, TextStyle, Ui, Window, Checkbox};
 use egui_glium::storage::FileStorage;
 // use std::sync::mpsc::channel;
+// use humansize::{file_size_opts::CONVENTIONAL, FileSize};
+use bytesize::ByteSize;
+
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use humansize::{FileSize, file_size_opts::CONVENTIONAL};
+use std::path::PathBuf;
+use env_logger;
+use log::*;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 // #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -63,8 +68,11 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
     ui.horizontal(|ui| {
         // ui.label(format!("{:<10}MB", file.size / 1024 / 1024));
         ui.add(
-            Label::new(format!("{}", file.size.file_size(CONVENTIONAL).unwrap_or_default()))
-                .text_style(TextStyle::Monospace),
+            Label::new(format!(
+                "{}",
+                ByteSize(file.size)
+            ))
+            .text_style(TextStyle::Monospace),
         );
         // ui.expand_to_size(egui::math::Vec2::new(100.,10.));
         if allow_delete {
@@ -76,9 +84,43 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
     });
 }
 
+fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool) {
+    
+
+        let scale = 0.5;
+        // Sort subdirs
+        ui.collapsing(
+            format!(
+                "{} | {} | {}%",
+                dir.path
+                    .file_name()
+                    .map(|d| d.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                ByteSize(dir.combined_size),
+                (scale * 100.) as u8
+            ),
+            |ui| {
+
+
+                for subdir in &dir.sorted_subdirs(info) {
+                    draw_dir(ui, subdir, info, allow_delete);
+                }
+                
+            },
+        );
+
+        if allow_delete {
+            if ui.button("Del").clicked {
+                // let _ = std::fs::remove_file(&file.path);
+            }
+        }
+    
+}
+
 fn gen_light_style() -> Style {
     let mut style = Style::default();
-    style.visuals.window_corner_radius = 1.;
+    style.visuals.window_corner_radius = 0.;
+    style.visuals.debug_widget_rects = true;
     style
 }
 
@@ -103,9 +145,13 @@ fn get_dirinfo(path: &String, sender: Sender<DirInfo>, ready: Sender<bool>) {
 
     thread::spawn(move || {
         dbg!("Start scan");
-        let final_info = diskspace_insight::scan_callback(&p, |d| {
-            let _ = s.send(d.clone());
-        }, 2000);
+        let final_info = diskspace_insight::scan_callback(
+            &p,
+            |d| {
+                let _ = s.send(d.clone());
+            },
+            2000,
+        );
 
         // let final_info = diskspace_insight::scan(&p);
 
@@ -121,9 +167,8 @@ impl egui::app::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut dyn egui::app::Backend) {
         let accent_color = Srgba::new(120, 50, 200, 255);
 
-        ui.set_style(gen_light_style());
-        ui.style_mut().visuals.window_corner_radius = 1.;
-        ui.style_mut().visuals.dark_bg_color = Srgba::new(100, 0, 100, 255);
+    
+        // ui.style_mut().visuals.ui(ui);
 
         // ui.style_mut().visuals.dark_bg_color
 
@@ -146,6 +191,7 @@ impl egui::app::App for MyApp {
             ui.ctx().request_repaint();
         }
 
+
         // ui.ctx().request_repaint();
 
         while let Ok(r_info) = dirinfo_receiver.try_recv() {
@@ -164,7 +210,16 @@ impl egui::app::App for MyApp {
             *ready = true;
         }
 
+        ui.set_style(gen_light_style());
+        ui.style_mut().visuals.window_corner_radius = 1.;
+        ui.style_mut().visuals.dark_bg_color = Srgba::new(100, 0, 100, 255);
+        ui.style_mut().visuals.widgets.active.corner_radius = 0.;
         Window::new("Setup").show(ui.ctx(), |ui| {
+
+
+            // ui.ctx().settings_ui(ui);
+
+
             ui.horizontal(|ui| {
                 if ui.button("Home").clicked {
                     if let Some(dir) = dirs::home_dir() {
@@ -193,7 +248,10 @@ impl egui::app::App for MyApp {
 
             ui.text_edit(scan_path);
 
-            ui.checkbox("Allow deletion", allow_delete);
+            // ui.checkbox("Allow deletion", allow_delete);
+            //ui.checkbox(allow_delete, allow_delete);
+            Checkbox::new(allow_delete, "Allow deletion");
+            
             // if ui.button("Scan!").clicked {
             //     *info = diskspace_insight::scan(&scan_path);
             // }
@@ -211,9 +269,7 @@ impl egui::app::App for MyApp {
                 }
             } else {
                 ui.label(format!("Scanned {} files...", info.files.len()));
-
             }
-
         });
 
         Window::new("Filetypes").scroll(true).show(ui.ctx(), |ui| {
@@ -225,30 +281,29 @@ impl egui::app::App for MyApp {
             if !*ready {
                 ui.label(format!("Please wait for scan"));
             }
-                for (i, filetype) in info.types_by_size.iter().enumerate() {
-                    if i as i32 >= *max_types {
-                        break;
-                    }
-
-                    let scale = filetype.size as f32 / info.combined_size as f32;
-                    paint_size_bar_before_next(ui, scale, accent_color);
-
-                    ui.collapsing(
-                        format!(
-                            "{} | {} | {}% | {} files",
-                            filetype.ext,
-                            filetype.size.file_size(CONVENTIONAL).unwrap_or_default(),
-                            (scale * 100.) as u8,
-                            filetype.files.len()
-                        ),
-                        |ui| {
-                            for file in &filetype.files {
-                                draw_file(ui, file, *allow_delete);
-                            }
-                        },
-                    );
+            for (i, filetype) in info.types_by_size.iter().enumerate() {
+                if i as i32 >= *max_types {
+                    break;
                 }
-            
+
+                let scale = filetype.size as f32 / info.combined_size as f32;
+                paint_size_bar_before_next(ui, scale, accent_color);
+
+                ui.collapsing(
+                    format!(
+                        "{} | {} | {}% | {} files",
+                        filetype.ext,
+                        ByteSize(filetype.size),
+                        (scale * 100.) as u8,
+                        filetype.files.len()
+                    ),
+                    |ui| {
+                        for file in &filetype.files {
+                            draw_file(ui, file, *allow_delete);
+                        }
+                    },
+                );
+            }
         });
 
         Window::new("Files").scroll(true).show(ui.ctx(), |ui| {
@@ -263,10 +318,10 @@ impl egui::app::App for MyApp {
             }
         });
 
-        Window::new("Directories")
+        Window::new("Largest directories")
             .scroll(true)
             .show(ui.ctx(), |ui| {
-                ui.label(format!("Directories"));
+                ui.label(format!("Directories, by size"));
                 ui.add(Slider::i32(max_dirs, 1..=100).text("max results"));
 
                 for (i, dir) in info.dirs_by_size.iter().enumerate() {
@@ -286,7 +341,7 @@ impl egui::app::App for MyApp {
                                 .file_name()
                                 .map(|d| d.to_string_lossy().to_string())
                                 .unwrap_or_default(),
-                            dir.size.file_size(CONVENTIONAL).unwrap_or_default(),
+                            ByteSize(dir.size),
                             (scale * 100.) as u8
                         ),
                         |ui| {
@@ -296,6 +351,43 @@ impl egui::app::App for MyApp {
                         },
                     );
                 }
+            });
+
+        Window::new("Directories")
+            .scroll(true)
+            .show(ui.ctx(), |ui| {
+                ui.label(format!("Directories"));
+
+                    let root_dir = PathBuf::from(scan_path.clone());
+                    if let Some(d) = info.tree.get(&root_dir) {
+                        draw_dir(ui, d, info, allow_delete.clone())
+
+                    }
+
+
+
+                    // let scale = dir.size as f32 / info.combined_size as f32;
+
+                    // paint_size_bar_before_next(ui, scale, accent_color);
+
+                    // // ui.label(format!("{:?} {}", dir.path, dir.size / 1024 / 1024));
+                    // ui.collapsing(
+                    //     format!(
+                    //         "{} | {} | {}%",
+                    //         dir.path
+                    //             .file_name()
+                    //             .map(|d| d.to_string_lossy().to_string())
+                    //             .unwrap_or_default(),
+                    //         dir.size.file_size(CONVENTIONAL).unwrap_or_default(),
+                    //         (scale * 100.) as u8
+                    //     ),
+                    //     |ui| {
+                    //         // for file in &filetype.files {
+                    //         //     draw_file(ui, file, *allow_delete);
+                    //         // }
+                    //     },
+                    // );
+                
             });
 
         Window::new("Filter builder")
@@ -397,6 +489,9 @@ impl egui::app::App for MyApp {
 
 fn main() {
     // let i = diskspace_insight::scan("/home/woelper/Downloads");
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+
     let title = "birdseye";
     let storage = FileStorage::from_path(".birdseye.json".into());
     let mut app: MyApp = MyApp::default();
