@@ -1,22 +1,25 @@
 #![warn(clippy::all)]
 #![windows_subsystem = "windows"]
 
+use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use bytesize::ByteSize;
 use dirs;
 use diskspace_insight;
-use diskspace_insight::{DirInfo, File, Directory};
+use diskspace_insight::{DirInfo, Directory, File};
 // use egui::math::Vec2;
 use egui::paint::color::Srgba;
-use egui::{paint::PaintCmd, Label, Rect, Slider, Style, TextStyle, Ui, Window, Checkbox};
+use egui::{paint::PaintCmd, Checkbox, Label, Slider, Style, TextStyle, Ui, Window};
 use egui_glium::storage::FileStorage;
 // use std::sync::mpsc::channel;
 // use humansize::{file_size_opts::CONVENTIONAL, FileSize};
-use bytesize::ByteSize;
 
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
-use std::path::PathBuf;
 use env_logger;
 use log::*;
+use std::thread;
+
+#[cfg(test)]
+mod tests;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 // #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -67,13 +70,7 @@ enum Filter {
 fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
     ui.horizontal(|ui| {
         // ui.label(format!("{:<10}MB", file.size / 1024 / 1024));
-        ui.add(
-            Label::new(format!(
-                "{}",
-                ByteSize(file.size)
-            ))
-            .text_style(TextStyle::Monospace),
-        );
+        ui.add(Label::new(format!("{}", ByteSize(file.size))).text_style(TextStyle::Monospace));
         // ui.expand_to_size(egui::math::Vec2::new(100.,10.));
         if allow_delete {
             if ui.button("Del").clicked {
@@ -84,37 +81,44 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
     });
 }
 
-fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool) {
+fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, accent_color: Srgba) {
+   
+    let scale = dir.combined_size as f32 / info.combined_size as f32;
+
+    // let scale = match dir.parent {
+    //     Some(p) => {
+    //         10.
+    //     },
+    //     None => {100.}
+    // };
+
     
-
-        let scale = 0.5;
-        // Sort subdirs
-        ui.collapsing(
-            format!(
-                "{} | {} | {}%",
-                dir.path
-                    .file_name()
-                    .map(|d| d.to_string_lossy().to_string())
-                    .unwrap_or_default(),
-                ByteSize(dir.combined_size),
-                (scale * 100.) as u8
-            ),
-            |ui| {
-
-
-                for subdir in &dir.sorted_subdirs(info) {
-                    draw_dir(ui, subdir, info, allow_delete);
-                }
-                
-            },
-        );
-
-        if allow_delete {
-            if ui.button("Del").clicked {
-                // let _ = std::fs::remove_file(&file.path);
+    paint_size_bar_before_next(ui, scale, accent_color);
+   
+    //let scale = 0.5;
+    // Sort subdirs
+    ui.collapsing(
+        format!(
+            "{} | {} | {}%",
+            dir.path
+                .file_name()
+                .map(|d| d.to_string_lossy().to_string())
+                .unwrap_or_default(),
+            ByteSize(dir.combined_size),
+            (scale * 100.) as u8
+        ),
+        |ui| {
+            for subdir in &dir.sorted_subdirs(info) {
+                draw_dir(ui, subdir, info, allow_delete, accent_color);
             }
+        },
+    );
+
+    if allow_delete {
+        if ui.button("Del").clicked {
+            // let _ = std::fs::remove_file(&file.path);
         }
-    
+    }
 }
 
 fn gen_light_style() -> Style {
@@ -144,20 +148,24 @@ fn get_dirinfo(path: &String, sender: Sender<DirInfo>, ready: Sender<bool>) {
     let p = path.clone();
 
     thread::spawn(move || {
+        let timer = std::time::Instant::now();
         dbg!("Start scan");
-        let final_info = diskspace_insight::scan_callback(
-            &p,
-            |d| {
-                let _ = s.send(d.clone());
-            },
-            2000,
+        // let final_info = diskspace_insight::scan_callback(
+        //     &p,
+        //     |d| {
+        //         let _ = s.send(d.clone());
+        //     },
+        //     2000,
+        // );
+
+        let final_info = diskspace_insight::scan(
+            &p
         );
 
-        // let final_info = diskspace_insight::scan(&p);
 
         let _ = s.send(final_info);
         let _ = r.send(true);
-        dbg!("Done scanning");
+        println!("Done scanning in {} s", timer.elapsed().as_secs_f32());
     });
 }
 
@@ -167,7 +175,6 @@ impl egui::app::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut dyn egui::app::Backend) {
         let accent_color = Srgba::new(120, 50, 200, 255);
 
-    
         // ui.style_mut().visuals.ui(ui);
 
         // ui.style_mut().visuals.dark_bg_color
@@ -190,7 +197,6 @@ impl egui::app::App for MyApp {
         if !*ready {
             ui.ctx().request_repaint();
         }
-
 
         // ui.ctx().request_repaint();
 
@@ -215,10 +221,7 @@ impl egui::app::App for MyApp {
         ui.style_mut().visuals.dark_bg_color = Srgba::new(100, 0, 100, 255);
         ui.style_mut().visuals.widgets.active.corner_radius = 0.;
         Window::new("Setup").show(ui.ctx(), |ui| {
-
-
             // ui.ctx().settings_ui(ui);
-
 
             ui.horizontal(|ui| {
                 if ui.button("Home").clicked {
@@ -251,7 +254,7 @@ impl egui::app::App for MyApp {
             // ui.checkbox("Allow deletion", allow_delete);
             //ui.checkbox(allow_delete, allow_delete);
             Checkbox::new(allow_delete, "Allow deletion");
-            
+
             // if ui.button("Scan!").clicked {
             //     *info = diskspace_insight::scan(&scan_path);
             // }
@@ -321,7 +324,7 @@ impl egui::app::App for MyApp {
         Window::new("Largest directories")
             .scroll(true)
             .show(ui.ctx(), |ui| {
-                ui.label(format!("Directories, by size"));
+                ui.label(format!("Largest individual directories"));
                 ui.add(Slider::i32(max_dirs, 1..=100).text("max results"));
 
                 for (i, dir) in info.dirs_by_size.iter().enumerate() {
@@ -358,36 +361,14 @@ impl egui::app::App for MyApp {
             .show(ui.ctx(), |ui| {
                 ui.label(format!("Directories"));
 
-                    let root_dir = PathBuf::from(scan_path.clone());
-                    if let Some(d) = info.tree.get(&root_dir) {
-                        draw_dir(ui, d, info, allow_delete.clone())
+             
 
-                    }
+                let root_dir = PathBuf::from(scan_path.clone());
+                if let Some(d) = info.tree.get(&root_dir) {
+                    draw_dir(ui, d, info, allow_delete.clone(), accent_color)
+                }
 
-
-
-                    // let scale = dir.size as f32 / info.combined_size as f32;
-
-                    // paint_size_bar_before_next(ui, scale, accent_color);
-
-                    // // ui.label(format!("{:?} {}", dir.path, dir.size / 1024 / 1024));
-                    // ui.collapsing(
-                    //     format!(
-                    //         "{} | {} | {}%",
-                    //         dir.path
-                    //             .file_name()
-                    //             .map(|d| d.to_string_lossy().to_string())
-                    //             .unwrap_or_default(),
-                    //         dir.size.file_size(CONVENTIONAL).unwrap_or_default(),
-                    //         (scale * 100.) as u8
-                    //     ),
-                    //     |ui| {
-                    //         // for file in &filetype.files {
-                    //         //     draw_file(ui, file, *allow_delete);
-                    //         // }
-                    //     },
-                    // );
-                
+        
             });
 
         Window::new("Filter builder")
