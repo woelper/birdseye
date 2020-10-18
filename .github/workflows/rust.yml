@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install xcb
-      run: sudo apt-get install libxcb1-dev
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
     - name: Build
       run: cargo build --release
     - name: Run tests
