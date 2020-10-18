@@ -1,12 +1,12 @@
 #![warn(clippy::all)]
 #![windows_subsystem = "windows"]
 
-use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use bytesize::ByteSize;
 use dirs;
 use diskspace_insight;
 use diskspace_insight::{DirInfo, Directory, File};
+use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 // use egui::math::Vec2;
 use egui::paint::color::Srgba;
 use egui::{paint::PaintCmd, Checkbox, Label, Slider, Style, TextStyle, Ui, Window};
@@ -82,7 +82,6 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
 }
 
 fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, accent_color: Srgba) {
-   
     let scale = dir.combined_size as f32 / info.combined_size as f32;
 
     // let scale = match dir.parent {
@@ -92,9 +91,8 @@ fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, ac
     //     None => {100.}
     // };
 
-    
     paint_size_bar_before_next(ui, scale, accent_color);
-   
+
     //let scale = 0.5;
     // Sort subdirs
     ui.collapsing(
@@ -158,10 +156,7 @@ fn get_dirinfo(path: &String, sender: Sender<DirInfo>, ready: Sender<bool>) {
         //     2000,
         // );
 
-        let final_info = diskspace_insight::scan(
-            &p
-        );
-
+        let final_info = diskspace_insight::scan(&p);
 
         let _ = s.send(final_info);
         let _ = r.send(true);
@@ -172,7 +167,12 @@ fn get_dirinfo(path: &String, sender: Sender<DirInfo>, ready: Sender<bool>) {
 impl egui::app::App for MyApp {
     /// This function will be called whenever the Ui needs to be shown,
     /// which may be many times per second.
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut dyn egui::app::Backend) {
+    fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        _info: &egui::app::BackendInfo,
+        _tex_allocator: Option<&mut dyn egui::app::TextureAllocator>,
+    ) -> egui::app::AppOutput {
         let accent_color = Srgba::new(120, 50, 200, 255);
 
         // ui.style_mut().visuals.ui(ui);
@@ -361,14 +361,10 @@ impl egui::app::App for MyApp {
             .show(ui.ctx(), |ui| {
                 ui.label(format!("Directories"));
 
-             
-
                 let root_dir = PathBuf::from(scan_path.clone());
                 if let Some(d) = info.tree.get(&root_dir) {
                     draw_dir(ui, d, info, allow_delete.clone(), accent_color)
                 }
-
-        
             });
 
         Window::new("Filter builder")
@@ -461,6 +457,7 @@ impl egui::app::App for MyApp {
                     }
                 }
             });
+        Default::default()
     }
 
     // fn on_exit(&mut self, storage: &mut dyn egui::app::Storage) {

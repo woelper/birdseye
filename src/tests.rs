@@ -2,7 +2,6 @@ use super::*;
 
 use std::process::Command;
 
-
 #[test]
 fn walk() {
     std::env::set_var("RUST_LOG", "debug");
@@ -14,7 +13,6 @@ fn walk() {
         .output()
         .unwrap();
 
-
     Command::new("dd")
         .arg("if=/dev/urandom")
         .arg("of=test/a/file_20m.20")
@@ -23,12 +21,5 @@ fn walk() {
         .output()
         .unwrap();
 
-
-        // use walkdir::WalkDir;
-
-     
-
-
-
- 
+    // use walkdir::WalkDir;
 }
