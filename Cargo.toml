@@ -1,6 +1,6 @@
 [package]
 name = "birdseye"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 
@@ -15,8 +15,19 @@ diskspace_insight = "0.1.5"
 dirs = "3.0.1"
 bytesize = "1.0.1"
 log = "0.4.11"
-env_logger = "0.7.1"
+env_logger = "0.8.1"
 
 
 
-#git@github.com:emilk/egui.git
+[package.metadata.bundle]
+name = "birdseye"
+identifier = "com.github.woelper.birdseye"
+icon = ["icon.png", "128x128.png", "128x128@2x.png"]
+version = "1.0.0"
+#resources = ["assets", "images/**/*.png", "secrets/public_key.txt"]
+copyright = "Johann Woelper"
+category = "Developer Tool"
+short_description = "Check where your diskspace is used"
+long_description = """
+Use birdseye to get an overview of what uses most space on your filesystem.
+"""

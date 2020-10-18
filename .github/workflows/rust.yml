@@ -31,3 +31,9 @@ jobs:
       with:
         name: ${{ matrix.os }}
         path: target/release/birdseye
+    - name: Upload Windows
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}
+        path: target/release/birdseye.exe
+    
