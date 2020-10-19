@@ -477,5 +477,5 @@ fn main() {
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    egui_glium::run(title, storage, app);
+    egui_glium::run(title, Box::new(storage), app);
 }
