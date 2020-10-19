@@ -1,0 +1,46 @@
+name: Rust Release
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        rust: [nightly]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install xcb
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
+      if: matrix.os == 'ubuntu-latest'
+    - name: Build
+      run: cargo build --release
+    - name: Run tests
+      run: cargo test
+    - name: Upload
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}
+        path: target/release/birdseye
+    - name: Upload Windows
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}
+        path: target/release/birdseye.exe
+    - name: Upload Win Release
+      uses: jasonetco/upload-to-release@v0.1.1
+      with:
+        args: target/release/birdseye.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: matrix.os == 'windows-latest'
+      
