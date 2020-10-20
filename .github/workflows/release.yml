@@ -10,8 +10,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
+  create_release:
+    name: Create release
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
     - name: Create release
       id: create_release
@@ -23,6 +26,8 @@ jobs:
         release_name: Release ${{ github.ref }}
 
   build:
+    name: Build release
+    needs: create_release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -31,21 +36,26 @@ jobs:
         rust: [nightly]
     steps:
     - uses: actions/checkout@v2
+
     - name: Install xcb
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
       if: matrix.os == 'ubuntu-latest'
+
     - name: Build
       run: cargo build --release
+
     - name: Upload
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}
         path: target/release/birdseye
+
     - name: Upload Windows
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}
         path: target/release/birdseye.exe
+
     - name: Upload release
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1
@@ -56,4 +66,3 @@ jobs:
         asset_path: target/release/birdseye
         asset_name: birdseye
         asset_content_type: application/zip
-      
