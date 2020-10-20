@@ -347,7 +347,7 @@ impl egui::app::App for MyApp {
                             ByteSize(dir.size),
                             (scale * 100.) as u8
                         ),
-                        |ui| {
+                        |_ui| {
                             // for file in &filetype.files {
                             //     draw_file(ui, file, *allow_delete);
                             // }
@@ -406,8 +406,7 @@ impl egui::app::App for MyApp {
                         }
                         Filter::MaxResults(max) => {
                             ui.add(Slider::i32(max, 1..=100).text("max results"));
-                        }
-                        _ => (),
+                        } // _ => (),
                     }
                 }
 
@@ -446,8 +445,7 @@ impl egui::app::App for MyApp {
                                     if i as i32 >= *max {
                                         break 'filter;
                                     }
-                                }
-                                _ => (),
+                                } // _ => (),
                             }
                         }
 
