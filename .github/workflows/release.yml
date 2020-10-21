@@ -2,9 +2,8 @@ name: Rust Release
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    tags:
+      - "*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,6 +23,8 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
+        draft: true
+
 
   build:
     name: Build release
