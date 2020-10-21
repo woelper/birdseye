@@ -25,7 +25,6 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: true
 
-
   build:
     name: Build release
     needs: create_release
@@ -44,18 +43,6 @@ jobs:
 
     - name: Build
       run: cargo build --release
-
-    - name: Upload
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.os }}
-        path: target/release/birdseye
-
-    - name: Upload Windows
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.os }}
-        path: target/release/birdseye.exe
 
     - name: Upload Linux Release
       if: matrix.os == 'ubuntu-latest'
@@ -90,3 +77,15 @@ jobs:
         asset_path: target/release/birdseye.exe
         asset_name: birdseye.exe
         asset_content_type: application/zip
+
+  publish_release:
+    name: Publish release
+    needs: [upload-release-asset-lin, upload-release-asset-mac, upload-release-asset-lin]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Publish
+      uses: eregon/publish-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        release_name: Release ${{ github.ref }}
