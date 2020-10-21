@@ -56,14 +56,36 @@ jobs:
         name: ${{ matrix.os }}
         path: target/release/birdseye.exe
 
-    - name: Upload release
+    - name: Upload Linux Release
+      if: matrix.os == 'ubuntu-latest'
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        #upload_url: ${{ steps.create_release.outputs.upload_url }}
         upload_url: ${{ needs.create_release.outputs.upload_url }}
         asset_path: target/release/birdseye
-        asset_name: birdseye
+        asset_name: birdseye_linux
+        asset_content_type: application/zip
+    - name: Upload Mac Release
+      if: matrix.os == 'macOS-latest'
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: target/release/birdseye
+        asset_name: birdseye_mac
+        asset_content_type: application/zip
+    - name: Upload Windows Release
+      if: matrix.os == 'windows-latest'
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: target/release/birdseye.exe
+        asset_name: birdseye.exe
         asset_content_type: application/zip
