@@ -80,7 +80,7 @@ jobs:
 
   publish_release:
     name: Publish release
-    needs: [upload-release-asset-lin, upload-release-asset-mac, upload-release-asset-lin]
+    needs: build
     runs-on: ubuntu-latest
     steps:
     - name: Publish
