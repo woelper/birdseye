@@ -9,7 +9,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_release:
+  release_job:
     name: Create release
     runs-on: ubuntu-latest
     outputs:
@@ -28,9 +28,9 @@ jobs:
     - name: Test id
       run: echo "${{ steps.create_release.outputs.id }}
 
-  build:
+  build_job:
     name: Build release
-    needs: create_release
+    needs: release_job
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -83,7 +83,7 @@ jobs:
 
   publish_release:
     name: Publish release
-    needs: build
+    needs: build_job
     runs-on: ubuntu-latest
     steps:
     - name: Publish
