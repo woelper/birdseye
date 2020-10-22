@@ -1,6 +1,6 @@
 [package]
 name = "birdseye"
-version = "0.2.27"
+version = "0.2.28"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 description = "Disk space analyser"
