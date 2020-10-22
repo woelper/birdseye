@@ -15,8 +15,6 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
-    env:
-      release_id: ${{ steps.create_release.outputs.id }}
     steps:
     - name: Create release
       id: create_release
@@ -85,7 +83,7 @@ jobs:
 
   publish_release:
     name: Publish release
-    needs: build_job
+    needs: [build_job, release_job]
     runs-on: ubuntu-latest
     steps:
     - name: Test id
@@ -97,4 +95,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        release_id: env.release_id
+        release_id: ${{ needs.release_job.outputs.release_id }}
