@@ -26,7 +26,7 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: true
     - name: Test id
-      run: echo "${{ steps.create_release.outputs.id }}"
+      run: echo "${{ steps.create_release.outputs.id }}" > release_id
 
   build_job:
     name: Build release
@@ -87,12 +87,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Test id
-      run: echo "${{ steps.create_release.outputs.id }}"
-    - name: Test id 2
       run: echo "${{ needs.release_job.outputs.release_id }}"
+    - name: set id
+      run: release_id=$(cat release_id)
+    - name: Test id 2
+      run: echo "${{ needs.release_job.outputs.upload_url }}"
     - name: Publish
       uses: eregon/publish-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        release_id: ${{ steps.create_release.outputs.id }}
+        release_id: ${{ release_id }}
