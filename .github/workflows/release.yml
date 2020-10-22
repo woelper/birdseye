@@ -88,4 +88,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        release_name: Release ${{ github.ref }}
+        release_id: ${{ steps.create_release.outputs.id }}
