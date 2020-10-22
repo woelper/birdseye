@@ -9,12 +9,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create_release:
+  build_release:
     name: Create release
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      release_id: ${{ steps.create_release.outputs.id }}
+      # release_id: ${{ steps.create_release.outputs.id }}
     steps:
     - name: Create release
       id: create_release
@@ -25,6 +25,8 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: true
+    - name: Test id
+      run: echo "${{ steps.create_release.outputs.id }}
 
   build:
     name: Build release
@@ -89,4 +91,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        release_id: ${{ needs.create_release.outputs.release_id }}
+        release_id: ${{ steps.create_release.outputs.id }}
