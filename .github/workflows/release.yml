@@ -54,7 +54,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/birdseye
         asset_name: birdseye_linux
         asset_content_type: application/zip
@@ -65,7 +65,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/birdseye
         asset_name: birdseye_mac
         asset_content_type: application/zip
@@ -76,7 +76,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/birdseye.exe
         asset_name: birdseye.exe
         asset_content_type: application/zip
