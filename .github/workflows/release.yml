@@ -15,6 +15,8 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
+    env:
+      release_id: ${{ steps.create_release.outputs.id }}
     steps:
     - name: Create release
       id: create_release
@@ -25,7 +27,7 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: true
-    - name: Test id
+    - name: Write release id to file
       run: echo "${{ steps.create_release.outputs.id }}" > release_id
 
   build_job:
@@ -88,8 +90,6 @@ jobs:
     steps:
     - name: Test id
       run: echo "${{ needs.release_job.outputs.release_id }}"
-    - name: set id
-      run: release_id=$(cat release_id)
     - name: Test id 2
       run: echo "${{ needs.release_job.outputs.upload_url }}"
     - name: Publish
@@ -97,4 +97,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        release_id: ${{ steps.publish_release.outputs.release_id }}
+        release_id: env.release_id
