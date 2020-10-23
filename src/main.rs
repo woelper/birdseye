@@ -93,7 +93,6 @@ fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, ac
 
     paint_size_bar_before_next(ui, scale, accent_color);
 
-    //let scale = 0.5;
     // Sort subdirs
     ui.collapsing(
         format!(
@@ -108,6 +107,13 @@ fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, ac
         |ui| {
             for subdir in &dir.sorted_subdirs(info) {
                 draw_dir(ui, subdir, info, allow_delete, accent_color);
+            }
+
+            for (i, file) in dir.sorted_files().iter().enumerate() {
+                if i as i32 > 10 {
+                    break;
+                }
+                draw_file(ui, file, allow_delete);
             }
         },
     );
@@ -347,10 +353,13 @@ impl egui::app::App for MyApp {
                             ByteSize(dir.size),
                             (scale * 100.) as u8
                         ),
-                        |_ui| {
-                            // for file in &filetype.files {
-                            //     draw_file(ui, file, *allow_delete);
-                            // }
+                        |ui| {
+                            for (i, file) in dir.sorted_files().iter().enumerate() {
+                                if i as i32 > *max_dirs {
+                                    break;
+                                }
+                                draw_file(ui, file, *allow_delete);
+                            }
                         },
                     );
                 }
