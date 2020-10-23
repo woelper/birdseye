@@ -5,24 +5,18 @@ use bytesize::ByteSize;
 use dirs;
 use diskspace_insight;
 use diskspace_insight::{DirInfo, Directory, File};
-use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
-// use egui::math::Vec2;
 use egui::paint::color::Srgba;
-use egui::{paint::PaintCmd, Checkbox, Label, Slider, Style, TextStyle, Ui, Window};
+use egui::{paint::PaintCmd, Button, Checkbox, Label, Slider, Style, TextStyle, Ui, Window};
 use egui_glium::storage::FileStorage;
-// use std::sync::mpsc::channel;
-// use humansize::{file_size_opts::CONVENTIONAL, FileSize};
-
 use env_logger;
 use log::*;
+use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 #[cfg(test)]
 mod tests;
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-// #[derive(Default, serde::Deserialize, serde::Serialize)]
 struct MyApp {
     scan_path: String,
     max_types: i32,
@@ -35,6 +29,9 @@ struct MyApp {
     dirinfo_sender: Sender<DirInfo>,
     ready_receiver: Receiver<bool>,
     ready_sender: Sender<bool>,
+    del_receiver: Receiver<PathBuf>,
+    del_sender: Sender<PathBuf>,
+
     ready: bool,
 }
 
@@ -42,6 +39,7 @@ impl Default for MyApp {
     fn default() -> MyApp {
         let (s, r): (Sender<DirInfo>, Receiver<DirInfo>) = channel();
         let (bs, br): (Sender<bool>, Receiver<bool>) = channel();
+        let (ds, dr): (Sender<PathBuf>, Receiver<PathBuf>) = channel();
         MyApp {
             scan_path: String::default(),
             max_types: 10,
@@ -54,6 +52,8 @@ impl Default for MyApp {
             dirinfo_sender: s,
             ready_receiver: br,
             ready_sender: bs,
+            del_receiver: dr,
+            del_sender: ds,
             ready: true,
         }
     }
@@ -67,7 +67,7 @@ enum Filter {
     MaxResults(i32),
 }
 
-fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
+fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool, del_sender: Sender<PathBuf>) {
     ui.horizontal(|ui| {
         // ui.label(format!("{:<10}MB", file.size / 1024 / 1024));
         ui.add(Label::new(format!("{}", ByteSize(file.size))).text_style(TextStyle::Monospace));
@@ -75,21 +75,22 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool) {
         if allow_delete {
             if ui.button("Del").clicked {
                 let _ = std::fs::remove_file(&file.path);
+                let _ = del_sender.send(file.path.to_path_buf());
             }
         }
         ui.label(format!("{}", file.path.display()));
     });
 }
 
-fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, accent_color: Srgba) {
+fn draw_dir(
+    ui: &mut Ui,
+    dir: &Directory,
+    info: &DirInfo,
+    allow_delete: bool,
+    accent_color: Srgba,
+    del_sender: Sender<PathBuf>,
+) {
     let scale = dir.combined_size as f32 / info.combined_size as f32;
-
-    // let scale = match dir.parent {
-    //     Some(p) => {
-    //         10.
-    //     },
-    //     None => {100.}
-    // };
 
     paint_size_bar_before_next(ui, scale, accent_color);
 
@@ -105,24 +106,40 @@ fn draw_dir(ui: &mut Ui, dir: &Directory, info: &DirInfo, allow_delete: bool, ac
             (scale * 100.) as u8
         ),
         |ui| {
+            if allow_delete {
+                if ui
+                    .button(&format!(
+                        "Del {}",
+                        dir.path
+                            .file_name()
+                            .map(|d| d.to_string_lossy().to_string())
+                            .unwrap_or_default(),
+                    ))
+                    .clicked
+                {
+                    let _ = std::fs::remove_dir_all(&dir.path);
+                    let _ = del_sender.send(dir.path.to_path_buf());
+                }
+            }
             for subdir in &dir.sorted_subdirs(info) {
-                draw_dir(ui, subdir, info, allow_delete, accent_color);
+                draw_dir(
+                    ui,
+                    subdir,
+                    info,
+                    allow_delete,
+                    accent_color,
+                    del_sender.clone(),
+                );
             }
 
             for (i, file) in dir.sorted_files().iter().enumerate() {
                 if i as i32 > 10 {
                     break;
                 }
-                draw_file(ui, file, allow_delete);
+                draw_file(ui, file, allow_delete, del_sender.clone());
             }
         },
     );
-
-    if allow_delete {
-        if ui.button("Del").clicked {
-            // let _ = std::fs::remove_file(&file.path);
-        }
-    }
 }
 
 fn gen_light_style() -> Style {
@@ -197,6 +214,8 @@ impl egui::app::App for MyApp {
             dirinfo_sender,
             ready_receiver,
             ready_sender,
+            del_receiver,
+            del_sender,
             ready,
         } = self;
 
@@ -220,6 +239,14 @@ impl egui::app::App for MyApp {
         while let Ok(_) = ready_receiver.try_recv() {
             // dbg!("Got RDY");
             *ready = true;
+        }
+
+        while let Ok(path) = del_receiver.try_recv() {
+            dbg!("Got del", &path);
+            info.tree.remove_entry(&path);
+            info.files.retain(|x| x.path != path);
+            info.dirs_by_size = info.dirs_by_size();
+            info.files_by_size = info.files_by_size();
         }
 
         ui.set_style(gen_light_style());
@@ -258,12 +285,8 @@ impl egui::app::App for MyApp {
             ui.text_edit(scan_path);
 
             // ui.checkbox("Allow deletion", allow_delete);
-            //ui.checkbox(allow_delete, allow_delete);
-            Checkbox::new(allow_delete, "Allow deletion");
-
-            // if ui.button("Scan!").clicked {
-            //     *info = diskspace_insight::scan(&scan_path);
-            // }
+            // ui.checkbox(allow_delete, allow_delete);
+            ui.add(Checkbox::new(allow_delete, "Allow deletion"));
 
             if *ready {
                 if ui.button("Scan").clicked {
@@ -308,7 +331,8 @@ impl egui::app::App for MyApp {
                     ),
                     |ui| {
                         for file in &filetype.files {
-                            draw_file(ui, file, *allow_delete);
+                            let s = del_sender.clone();
+                            draw_file(ui, file, *allow_delete, s);
                         }
                     },
                 );
@@ -323,7 +347,9 @@ impl egui::app::App for MyApp {
                 if i as i32 >= *max_files {
                     break;
                 }
-                draw_file(ui, file, *allow_delete);
+                let s = del_sender.clone();
+
+                draw_file(ui, file, *allow_delete, s);
             }
         });
 
@@ -358,7 +384,9 @@ impl egui::app::App for MyApp {
                                 if i as i32 > *max_dirs {
                                     break;
                                 }
-                                draw_file(ui, file, *allow_delete);
+                                let s = del_sender.clone();
+
+                                draw_file(ui, file, *allow_delete, s);
                             }
                         },
                     );
@@ -372,7 +400,8 @@ impl egui::app::App for MyApp {
 
                 let root_dir = PathBuf::from(scan_path.clone());
                 if let Some(d) = info.tree.get(&root_dir) {
-                    draw_dir(ui, d, info, allow_delete.clone(), accent_color)
+                    let sender = del_sender.clone();
+                    draw_dir(ui, d, info, allow_delete.clone(), accent_color, sender)
                 }
             });
 
@@ -457,8 +486,9 @@ impl egui::app::App for MyApp {
                                 } // _ => (),
                             }
                         }
+                        let s = del_sender.clone();
 
-                        draw_file(ui, file, *allow_delete);
+                        draw_file(ui, file, *allow_delete, s);
 
                         i += 1;
                     }
