@@ -40,12 +40,18 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install cargo bundle
+      run: cargo install cargo-bundle
+
     - name: Install xcb
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
       if: matrix.os == 'ubuntu-latest'
 
     - name: Build
       run: cargo build --release
+
+    - name: Build bundle
+      run: cargo bundle
 
     - name: Upload Linux Release
       if: matrix.os == 'ubuntu-latest'
