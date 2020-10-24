@@ -50,8 +50,13 @@ jobs:
     - name: Build
       run: cargo build --release
 
-    - name: Build bundle
-      run: cargo bundle
+    - name: Build Mac Bundle
+      run: cargo bundle --release
+      if: matrix.os == 'macOS-latest'
+
+    - name: Zip Mac Bundle
+      run: zip -r birdseye_app.zip target/release/bundle/osx/birdseye.app
+      if: matrix.os == 'macOS-latest'
 
     - name: Upload Linux Release
       if: matrix.os == 'ubuntu-latest'
@@ -64,6 +69,7 @@ jobs:
         asset_path: target/release/birdseye
         asset_name: birdseye_linux
         asset_content_type: application/zip
+
     - name: Upload Mac Release
       if: matrix.os == 'macOS-latest'
       id: upload-release-asset-mac
@@ -72,9 +78,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
-        asset_path: target/release/birdseye
-        asset_name: birdseye_mac
+        asset_path: birdseye_app.zip
+        asset_name: birdseye_mac.zip
         asset_content_type: application/zip
+
     - name: Upload Windows Release
       if: matrix.os == 'windows-latest'
       id: upload-release-asset-windows
