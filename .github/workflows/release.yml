@@ -55,7 +55,7 @@ jobs:
       if: matrix.os == 'macOS-latest'
 
     - name: Zip Mac Bundle
-      run: zip -r birdseye_app.zip target/release/bundle/osx/birdseye.app
+      run: mv target/release/bundle/osx/birdseye.app . && zip -r birdseye_app.zip birdseye.app
       if: matrix.os == 'macOS-latest'
 
     - name: Upload Linux Release
