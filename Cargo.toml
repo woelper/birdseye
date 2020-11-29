@@ -21,10 +21,12 @@ Use birdseye to get an overview of what uses most space on your filesystem.
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-egui = { git = "https://github.com/emilk/egui.git", features = ["serde"] }
+egui = { git = "https://github.com/emilk/egui.git", features = ["serde"]}
+#egui = { git = "https://github.com/emilk/egui.git", features = ["serde"], rev = "060ce6b4"}
 # egui = { version = "*", features = ["serde"] }
-egui_glium = { git = "https://github.com/emilk/egui.git" }
-diskspace_insight = "0.1.6"
+egui_glium = { git = "https://github.com/emilk/egui.git"}
+#egui_glium = { git = "https://github.com/emilk/egui.git", rev = "060ce6b4"}
+diskspace_insight = "0.1.7"
 #diskspace_insight = {git = "https://github.com/woelper/diskspace-insight.git", branch = "master"}
 #diskspace_insight = { path = "../diskspace-insight" }
 dirs = "3.0.1"
