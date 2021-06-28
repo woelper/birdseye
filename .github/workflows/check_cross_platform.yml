@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install xcb
-      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libxext-dev libxkbcommon-dev
       if: matrix.os == 'ubuntu-latest'
     - name: Build
       run: cargo check
