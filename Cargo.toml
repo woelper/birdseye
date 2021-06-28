@@ -4,7 +4,7 @@ version = "0.3.6"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 description = "Graphical disk space analyzer"
-
+license = "MIT"
 
 
 [package.metadata.bundle]
