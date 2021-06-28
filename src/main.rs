@@ -5,15 +5,21 @@ use bytesize::ByteSize;
 use dirs;
 use diskspace_insight;
 use diskspace_insight::{DirInfo, Directory, File};
-use egui::paint::color::Srgba;
-use egui::{paint::PaintCmd, Button, Checkbox, Label, Slider, Style, TextStyle, Ui, Window};
-use egui_glium::storage::FileStorage;
+use eframe::egui::Color32;
+// use egui::paint::color::Srgba;
+// use egui::{paint::PaintCmd, Button, Checkbox, Label, Slider, Style, TextStyle, Ui, Window, Stroke};
+// use egui_glium::storage::FileStorage;
 use env_logger;
 use log::*;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::path::Path;
+
+use eframe::{
+    egui::{self, Ui, Button, Checkbox, Label, Slider, Style, TextStyle, Window, Stroke, color::Rgba, paint::Shape},
+    epi,
+};
 
 #[cfg(test)]
 mod tests;
@@ -74,7 +80,7 @@ fn draw_file(ui: &mut Ui, file: &File, allow_delete: bool, del_sender: Sender<Pa
         ui.add(Label::new(format!("{}", ByteSize(file.size))).text_style(TextStyle::Monospace));
         // ui.expand_to_size(egui::math::Vec2::new(100.,10.));
         if allow_delete {
-            if ui.button("Del").clicked {
+            if ui.button("Del").clicked() {
                 let _ = std::fs::remove_file(&file.path);
                 let _ = del_sender.send(file.path.to_path_buf());
             }
@@ -88,7 +94,7 @@ fn draw_dir(
     dir: &Directory,
     info: &DirInfo,
     allow_delete: bool,
-    accent_color: Srgba,
+    accent_color: Color32,
     del_sender: Sender<PathBuf>,
 ) {
     let scale = dir.combined_size as f32 / info.combined_size as f32;
@@ -116,7 +122,7 @@ fn draw_dir(
                             .map(|d| d.to_string_lossy().to_string())
                             .unwrap_or_default(),
                     ))
-                    .clicked
+                    .clicked()
                 {
                     let _ = std::fs::remove_dir_all(&dir.path);
                     let _ = del_sender.send(dir.path.to_path_buf());
@@ -149,17 +155,18 @@ fn gen_light_style() -> Style {
     style
 }
 
-fn paint_size_bar_before_next(ui: &mut Ui, scale: f32, color: Srgba) {
+fn paint_size_bar_before_next(ui: &mut Ui, scale: f32, color: Color32) {
     // ask for available space - this is just to get the cursor
-    let mut paint_rect = ui.available();
+    // let mut paint_rect = ui.available();
+    let mut paint_rect = ui.available_rect_before_wrap();
     paint_rect.max.y = paint_rect.min.y + ui.style().spacing.interact_size.y + 2.;
-    paint_rect.max.x = paint_rect.min.x + ui.available().size().x * scale;
+    paint_rect.max.x = paint_rect.min.x + ui.available_rect_before_wrap().size().x * scale;
 
-    ui.painter().add(PaintCmd::Rect {
+    ui.painter().add(Shape::Rect {
         rect: paint_rect,
         corner_radius: 2.,
         fill: color,
-        stroke: egui::paint::command::Stroke::default(),
+        stroke: Stroke::default(),
     });
 }
 
@@ -199,18 +206,23 @@ fn get_dirinfo(path: &String, sender: Sender<DirInfo>, ready: Sender<bool>) {
     });
 }
 
-impl egui::app::App for MyApp {
+impl epi::App for MyApp {
+
+    fn name(&self) -> &str {
+        "egui template"
+    }
+
     /// This function will be called whenever the Ui needs to be shown,
     /// which may be many times per second.
-    fn ui(
+    fn update(
         &mut self,
         // ui: &mut egui::Ui,
-        ctx: &std::sync::Arc<egui::Context>,
-        integration_context: &mut egui::app::IntegrationContext,
+        ctx: &egui::CtxRef,
+        frame: &mut epi::Frame<'_>,
         // _info: &egui::app::BackendInfo,
         // _tex_allocator: Option<&mut dyn egui::app::TextureAllocator>,
     ) {
-        let accent_color = Srgba::new(120, 50, 200, 255);
+        let accent_color = Color32::from_rgb(120, 50, 200);
 
         // ui.style_mut().visuals.ui(ui);
 
@@ -260,34 +272,34 @@ impl egui::app::App for MyApp {
 
             ui.set_style(gen_light_style());
             ui.style_mut().visuals.window_corner_radius = 1.;
-            ui.style_mut().visuals.dark_bg_color = Srgba::new(100, 0, 100, 255);
+            ui.style_mut().visuals.faint_bg_color = Color32::new(100, 0, 100, 255);
             ui.style_mut().visuals.widgets.active.corner_radius = 0.;
             //ui.style_mut().interact(ui.ctx().response());
             Window::new("Setup").show(ui.ctx(), |ui| {
                 // ui.ctx().settings_ui(ui);
 
                 ui.horizontal(|ui| {
-                    if ui.button("Home").clicked {
+                    if ui.button("Home").clicked() {
                         if let Some(dir) = dirs::home_dir() {
                             *scan_path = dir.to_string_lossy().to_string();
                         }
                     }
-                    if ui.button("Downloads").clicked {
+                    if ui.button("Downloads").clicked() {
                         if let Some(dir) = dirs::download_dir() {
                             *scan_path = dir.to_string_lossy().to_string();
                         }
                     }
-                    if ui.button("Videos").clicked {
+                    if ui.button("Videos").clicked() {
                         if let Some(dir) = dirs::video_dir() {
                             *scan_path = dir.to_string_lossy().to_string();
                         }
                     }
-                    if ui.button("Cache").clicked {
+                    if ui.button("Cache").clicked() {
                         if let Some(dir) = dirs::cache_dir() {
                             *scan_path = dir.to_string_lossy().to_string();
                         }
                     }
-                    if ui.button("Temp").clicked {
+                    if ui.button("Temp").clicked() {
                         *scan_path = std::env::temp_dir().to_string_lossy().to_string();
                     }
                 });
@@ -299,7 +311,7 @@ impl egui::app::App for MyApp {
                 ui.add(Checkbox::new(allow_delete, "Allow deletion"));
 
                 if *ready {
-                    if ui.button("Scan").clicked {
+                    if ui.button("Scan").clicked() {
                         *ready = false;
                         let s = dirinfo_sender.clone();
                         let r = ready_sender.clone();
@@ -420,16 +432,16 @@ impl egui::app::App for MyApp {
                 .show(ui.ctx(), |ui| {
                     ui.label(format!("Filtered files"));
 
-                    if ui.button("Add min size").clicked {
+                    if ui.button("Add min size").clicked() {
                         filter_chain.push(Filter::MinSize(5));
                     }
-                    if ui.button("Add min age").clicked {
+                    if ui.button("Add min age").clicked() {
                         filter_chain.push(Filter::MinAge(1));
                     }
-                    if ui.button("Add max age").clicked {
+                    if ui.button("Add max age").clicked() {
                         filter_chain.push(Filter::MaxAge(30));
                     }
-                    if ui.button("Add max results").clicked {
+                    if ui.button("Add max results").clicked() {
                         filter_chain.push(Filter::MaxResults(50));
                     }
 
@@ -441,7 +453,7 @@ impl egui::app::App for MyApp {
                                     Slider::i32(size, 1..=1000)
                                         .text("hide files smaller than this (MB)"),
                                 );
-                                if ui.button("X").clicked {
+                                if ui.button("X").clicked() {
                                     //filter_chain.retain(|x| *x != *filter);
                                     drop(filter);
                                 }
@@ -525,11 +537,13 @@ fn main() {
     let _ = env_logger::try_init();
 
     let title = "birdseye";
-    let storage = FileStorage::from_path(".birdseye.json".into());
+    // let storage = FileStorage::from_path(".birdseye.json".into());
     let mut app: MyApp = MyApp::default();
     app.scan_path = dirs::home_dir()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    egui_glium::run(title, Box::new(storage), app);
+    let native_options = eframe::NativeOptions::default();
+
+    eframe::run_native(Box::new(app), native_options);
 }
